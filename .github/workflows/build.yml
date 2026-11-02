@@ -4,6 +4,10 @@ on:
     tags: ['v*', '*/v*']
 permissions:
   contents: read
+concurrency:
+  group: jietuma-plugins-tagged-release
+  cancel-in-progress: false
+
 jobs:
   build:
     outputs:
@@ -16,6 +20,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s scripts -p test_check_release_version.py
+      - run: python -m unittest discover -s scripts -p test_actions_retention.py
       - name: Validate release version
         id: version
         env:
@@ -47,3 +52,17 @@ jobs:
         with:
           files: dist/*.jtbplugin
           prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
+
+  cleanup:
+    needs: [build, release]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep the latest three Actions runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/actions_retention.py --keep 3

@@ -12,7 +12,7 @@ python scripts/package.py
 
 生成的 `.jtbplugin` 文件位于 `dist/`。在截图妈系统托盘右键菜单或剪贴板窗口的设置菜单选择“安装插件”。插件以当前用户权限运行，只应安装信任的来源。
 
-每个插件的版本独立维护，以其 `plugins/<id>/plugin.json` 的 `version` 为准；`Cargo.toml` 是共享构建工具的版本，不要求与插件一致。单独发布时只修改目标插件版本，提交后推送 `<插件ID>/v<版本>` 标签，例如 `code-highlight/v1.0.1`，工作流只打包并发布该插件。需要一次发布全部插件时使用 `v<批次版本>` 标签，各插件保留自己的版本。预发布使用版本后缀，如 `code-highlight/v1.1.0-beta.1`。分支推送和 Pull Request 只运行检查，不发布。
+每个插件的版本独立维护，以其 `plugins/<id>/plugin.json` 的 `version` 为准；`Cargo.toml` 是共享构建工具的版本，不要求与插件一致。单独发布时只修改目标插件版本，提交后推送 `<插件ID>/v<版本>` 标签，例如 `code-highlight/v1.0.1`，工作流只打包并发布该插件。需要一次发布全部插件时使用 `v<批次版本>` 标签，各插件保留自己的版本。预发布使用版本后缀，如 `code-highlight/v1.1.0-beta.1`。分支推送和 Pull Request 不触发 Actions；仅版本标签启动一次发布流程，包含版本校验、单元测试、打包和发布。每个仓库总共保留最近 3 次运行，当前或尚未结束的运行受保护；清理不删除 Release、发布附件或 Git 标签。
 
 可以用 `python scripts/package.py --plugin code-highlight` 只构建一个插件；不传参数构建全部插件。
 
