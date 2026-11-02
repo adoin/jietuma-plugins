@@ -5,6 +5,8 @@
 在 Windows 安装 Rust MSVC 工具链与 Python 3 后运行：
 
 ```powershell
+git clone https://github.com/adoin/jietuma-plugins.git
+cd jietuma-plugins
 python scripts/package.py
 ```
 

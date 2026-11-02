@@ -55,7 +55,7 @@ def main():
                     if icon not in icons:
                         package.write(manifest_path.parent.joinpath(*path.parts), icon)
                         icons.add(icon)
-            package.write(ROOT / "LICENSE", "licenses/jietuba-plugins-LICENSE")
+            package.write(ROOT / "LICENSE", "licenses/jietuma-plugins-LICENSE")
             package.writestr("licenses/THIRD_PARTY_LICENSES.txt", notices.encode("utf-8"))
         icon=manifest_path.parent/'plugin.ico'
         output.write_bytes((icon.read_bytes() if icon.is_file() else b'')+archive_bytes.getvalue())
