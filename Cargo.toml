@@ -1,10 +1,14 @@
 [package]
 name = "jietuba-plugins"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 license = "MIT"
 
 [dependencies]
+syntect = { version = "5.3", default-features = false, features = ["default-fancy", "yaml-load"] }
+roxmltree = "0.20"
+scraper = "0.24"
+csv = "1.3"
 age = "0.12.1"
 anyhow = "1"
 base64 = "0.22.1"
@@ -51,3 +55,11 @@ path = "src/script_transform.rs"
 [[bin]]
 name = "clipboard-backup"
 path = "src/clipboard_backup.rs"
+
+[[bin]]
+name = "spreadsheet"
+path = "src/spreadsheet.rs"
+
+[[bin]]
+name = "code-highlight"
+path = "src/code_highlight.rs"

@@ -7,7 +7,7 @@
     "ja": "JSON を整形してコピー",
     "ko": "JSON 서식 지정 후 복사"
   },
-  "version": "0.5.0",
+  "version": "0.6.0",
   "api_version": 2,
   "type": "extension",
   "command": "json-pretty.exe",

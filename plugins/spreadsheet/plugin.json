@@ -1,0 +1,186 @@
+{
+  "id": "spreadsheet",
+  "name": "Spreadsheet",
+  "name_i18n": {
+    "zh": "电子表格增强",
+    "zh_TW": "電子試算表增強"
+  },
+  "version": "0.6.0",
+  "api_version": 2,
+  "type": "extension",
+  "command": "spreadsheet.exe",
+  "settings": [
+    {
+      "key": "preview_rows",
+      "type": "number",
+      "label": "Preview row limit",
+      "label_i18n": {
+        "zh": "预览行数上限",
+        "zh_TW": "预览行数上限",
+        "en": "Preview row limit"
+      },
+      "default": 30,
+      "minimum": 1,
+      "maximum": 200
+    },
+    {
+      "key": "preview_columns",
+      "type": "number",
+      "label": "Preview column limit",
+      "label_i18n": {
+        "zh": "预览列数上限",
+        "zh_TW": "预览列数上限",
+        "en": "Preview column limit"
+      },
+      "default": 12,
+      "minimum": 1,
+      "maximum": 50
+    },
+    {
+      "key": "show_formulas",
+      "type": "boolean",
+      "label": "Show stored formulas (R1C1)",
+      "label_i18n": {
+        "zh": "预览时显示公式（R1C1）",
+        "zh_TW": "预览时显示公式",
+        "en": "Show formulas in preview"
+      },
+      "default": false
+    },
+    {
+      "key": "default_paste",
+      "type": "choice",
+      "label": "Default paste mode",
+      "label_i18n": {
+        "zh": "默认粘贴模式",
+        "zh_TW": "默认粘贴模式",
+        "en": "Default paste mode"
+      },
+      "default": "paste-original",
+      "choices": [
+        {
+          "value": "paste-original",
+          "name": "Stored original formats",
+          "name_i18n": {
+            "zh": "已保存的原格式",
+            "zh_TW": "已儲存的原格式",
+            "en": "Paste original formats"
+          }
+        },
+        {
+          "value": "paste-values",
+          "name": "Paste values only",
+          "name_i18n": {
+            "zh": "仅粘贴值",
+            "zh_TW": "仅粘贴值",
+            "en": "Paste values only"
+          }
+        },
+        {
+          "value": "paste-formulas",
+          "name": "Formulas and values without source styles",
+          "name_i18n": {
+            "zh": "公式与值（不带源样式）",
+            "zh_TW": "粘贴公式与值（无格式）",
+            "en": "Paste formulas and values without styles"
+          }
+        },
+        {
+          "value": "transpose-values",
+          "name": "Paste transposed values",
+          "name_i18n": {
+            "zh": "转置粘贴数值",
+            "zh_TW": "转置粘贴数值",
+            "en": "Paste transposed values"
+          }
+        }
+      ]
+    }
+  ],
+  "contributes": {
+    "commands": [
+      "render",
+      "paste-default",
+      "paste-original",
+      "paste-values",
+      "paste-formulas",
+      "transpose-values"
+    ],
+    "clipboard": {
+      "preview": {
+        "command": "render",
+        "content_types": [
+          "text"
+        ],
+        "priority": 100,
+        "formats": [
+          "XML Spreadsheet",
+          "HTML Format"
+        ]
+      },
+      "action": {
+        "command": "paste-default",
+        "content_types": [
+          "text"
+        ],
+        "formats": [
+          "XML Spreadsheet",
+          "HTML Format",
+          "CF_UNICODETEXT"
+        ],
+        "entries": [
+          {
+            "id": "default",
+            "command": "paste-default",
+            "name": "Paste spreadsheet",
+            "name_i18n": {
+              "zh": "粘贴表格（按设置）",
+              "zh_TW": "粘贴表格（按设置）"
+            }
+          },
+          {
+            "id": "original",
+            "command": "paste-original",
+            "name": "Paste stored original formats",
+            "name_i18n": {
+              "zh": "粘贴已保存的原格式",
+              "zh_TW": "貼上已儲存的原格式"
+            }
+          },
+          {
+            "id": "values",
+            "command": "paste-values",
+            "name": "Paste values only",
+            "name_i18n": {
+              "zh": "仅粘贴值",
+              "zh_TW": "仅粘贴值"
+            }
+          },
+          {
+            "id": "formulas",
+            "command": "paste-formulas",
+            "name": "Paste formulas and values without source styles",
+            "name_i18n": {
+              "zh": "粘贴公式与值（不带源样式）",
+              "zh_TW": "粘贴公式与值（无格式）"
+            }
+          },
+          {
+            "id": "transpose",
+            "command": "transpose-values",
+            "name": "Paste transposed values",
+            "name_i18n": {
+              "zh": "转置粘贴数值",
+              "zh_TW": "转置粘贴数值"
+            }
+          }
+        ],
+        "when_formats_any": [
+          "XML Spreadsheet",
+          "HTML Format"
+        ],
+        "when_text_contains": "\t"
+      }
+    }
+  }
+}

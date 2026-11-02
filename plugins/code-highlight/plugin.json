@@ -1,0 +1,310 @@
+{
+  "id": "code-highlight",
+  "name": "Code Highlight",
+  "name_i18n": {
+    "zh": "代码高亮",
+    "zh_TW": "程式碼高亮"
+  },
+  "version": "0.6.0",
+  "api_version": 2,
+  "type": "extension",
+  "command": "code-highlight.exe",
+  "settings": [
+    {
+      "key": "theme",
+      "type": "choice",
+      "label": "Highlight theme",
+      "label_i18n": {
+        "zh": "高亮主题",
+        "zh_TW": "高亮主题",
+        "en": "Highlight theme"
+      },
+      "default": "auto",
+      "choices": [
+        {
+          "value": "auto",
+          "name": "Follow application",
+          "name_i18n": {
+            "zh": "跟随应用",
+            "zh_TW": "跟随应用",
+            "en": "Follow application"
+          }
+        },
+        {
+          "value": "light",
+          "name": "Light",
+          "name_i18n": {
+            "zh": "浅色",
+            "zh_TW": "浅色",
+            "en": "Light"
+          }
+        },
+        {
+          "value": "dark",
+          "name": "Dark",
+          "name_i18n": {
+            "zh": "深色",
+            "zh_TW": "深色",
+            "en": "Dark"
+          }
+        }
+      ]
+    },
+    {
+      "key": "line_numbers",
+      "type": "boolean",
+      "label": "Line numbers",
+      "label_i18n": {
+        "zh": "显示行号",
+        "zh_TW": "显示行号",
+        "en": "Line numbers"
+      },
+      "default": true
+    },
+    {
+      "key": "max_lines",
+      "type": "number",
+      "label": "Preview line limit",
+      "label_i18n": {
+        "zh": "预览行数上限",
+        "zh_TW": "预览行数上限",
+        "en": "Preview line limit"
+      },
+      "default": 200,
+      "minimum": 10,
+      "maximum": 500
+    },
+    {
+      "key": "max_chars",
+      "type": "number",
+      "label": "Preview character limit",
+      "label_i18n": {
+        "zh": "预览字符上限",
+        "zh_TW": "预览字符上限",
+        "en": "Preview character limit"
+      },
+      "default": 50000,
+      "minimum": 500,
+      "maximum": 200000
+    }
+  ],
+  "contributes": {
+    "commands": [
+      "render"
+    ],
+    "clipboard": {
+      "preview": {
+        "command": "render",
+        "content_types": [
+          "text",
+          "file"
+        ],
+        "priority": 150
+      },
+      "metadata": {
+        "content_types": [
+          "text"
+        ],
+        "fields": [
+          {
+            "key": "language",
+            "type": "choice",
+            "label": "Code language",
+            "label_i18n": {
+              "zh": "代码语言",
+              "zh_TW": "程式碼語言"
+            },
+            "choices": [
+              {
+                "value": "plain",
+                "name": "Plain text",
+                "name_i18n": {
+                  "zh": "普通文本",
+                  "zh_TW": "普通文本",
+                  "en": "Plain text"
+                }
+              },
+              {
+                "value": "python",
+                "name": "Python",
+                "name_i18n": {
+                  "zh": "Python",
+                  "zh_TW": "Python",
+                  "en": "Python"
+                }
+              },
+              {
+                "value": "javascript",
+                "name": "JavaScript",
+                "name_i18n": {
+                  "zh": "JavaScript",
+                  "zh_TW": "JavaScript",
+                  "en": "JavaScript"
+                }
+              },
+              {
+                "value": "typescript",
+                "name": "TypeScript / JavaScript",
+                "name_i18n": {
+                  "zh": "TypeScript / JavaScript",
+                  "zh_TW": "TypeScript / JavaScript",
+                  "en": "TypeScript / JavaScript"
+                }
+              },
+              {
+                "value": "json",
+                "name": "JSON",
+                "name_i18n": {
+                  "zh": "JSON",
+                  "zh_TW": "JSON",
+                  "en": "JSON"
+                }
+              },
+              {
+                "value": "rust",
+                "name": "Rust",
+                "name_i18n": {
+                  "zh": "Rust",
+                  "zh_TW": "Rust",
+                  "en": "Rust"
+                }
+              },
+              {
+                "value": "cpp",
+                "name": "C / C++",
+                "name_i18n": {
+                  "zh": "C / C++",
+                  "zh_TW": "C / C++",
+                  "en": "C / C++"
+                }
+              },
+              {
+                "value": "csharp",
+                "name": "C#",
+                "name_i18n": {
+                  "zh": "C#",
+                  "zh_TW": "C#",
+                  "en": "C#"
+                }
+              },
+              {
+                "value": "java",
+                "name": "Java",
+                "name_i18n": {
+                  "zh": "Java",
+                  "zh_TW": "Java",
+                  "en": "Java"
+                }
+              },
+              {
+                "value": "go",
+                "name": "Go",
+                "name_i18n": {
+                  "zh": "Go",
+                  "zh_TW": "Go",
+                  "en": "Go"
+                }
+              },
+              {
+                "value": "sql",
+                "name": "SQL",
+                "name_i18n": {
+                  "zh": "SQL",
+                  "zh_TW": "SQL",
+                  "en": "SQL"
+                }
+              },
+              {
+                "value": "html",
+                "name": "HTML",
+                "name_i18n": {
+                  "zh": "HTML",
+                  "zh_TW": "HTML",
+                  "en": "HTML"
+                }
+              },
+              {
+                "value": "xml",
+                "name": "XML",
+                "name_i18n": {
+                  "zh": "XML",
+                  "zh_TW": "XML",
+                  "en": "XML"
+                }
+              },
+              {
+                "value": "css",
+                "name": "CSS",
+                "name_i18n": {
+                  "zh": "CSS",
+                  "zh_TW": "CSS",
+                  "en": "CSS"
+                }
+              },
+              {
+                "value": "yaml",
+                "name": "YAML",
+                "name_i18n": {
+                  "zh": "YAML",
+                  "zh_TW": "YAML",
+                  "en": "YAML"
+                }
+              },
+              {
+                "value": "toml",
+                "name": "TOML",
+                "name_i18n": {
+                  "zh": "TOML",
+                  "zh_TW": "TOML",
+                  "en": "TOML"
+                }
+              },
+              {
+                "value": "shell",
+                "name": "Shell",
+                "name_i18n": {
+                  "zh": "Shell",
+                  "zh_TW": "Shell",
+                  "en": "Shell"
+                }
+              },
+              {
+                "value": "powershell",
+                "name": "PowerShell",
+                "name_i18n": {
+                  "zh": "PowerShell",
+                  "zh_TW": "PowerShell",
+                  "en": "PowerShell"
+                }
+              },
+              {
+                "value": "markdown",
+                "name": "Markdown",
+                "name_i18n": {
+                  "zh": "Markdown",
+                  "zh_TW": "Markdown",
+                  "en": "Markdown"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "types": [
+        {
+          "id": "code",
+          "name": "Code",
+          "name_i18n": {
+            "zh": "代码",
+            "zh_TW": "程式碼"
+          },
+          "metadata_field": "language",
+          "exclude_values": [
+            "",
+            "plain"
+          ]
+        }
+      ]
+    }
+  }
+}

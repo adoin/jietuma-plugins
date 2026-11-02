@@ -7,7 +7,7 @@
     "ja": "除外するアプリ",
     "ko": "제외할 앱"
   },
-  "version": "0.5.0",
+  "version": "0.6.0",
   "api_version": 2,
   "type": "extension",
   "command": "source-exclusions.exe",
