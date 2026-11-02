@@ -62,7 +62,7 @@ jobs:
       actions: write
     steps:
       - uses: actions/checkout@v4
-      - name: Keep the latest three Actions runs
+      - name: Keep three successful and three failed runs
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/actions_retention.py --keep 3

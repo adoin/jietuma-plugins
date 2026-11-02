@@ -1,4 +1,4 @@
-"""Keep the latest workflow runs; never delete active runs or the current run.
+"""Keep three successful and three failed runs; protect active/current runs.
 
 This operates on Actions history only, not Releases, Git tags or source commits.
 """
@@ -9,17 +9,22 @@ import os
 import re
 import subprocess
 
+FAILURES = {'failure', 'timed_out', 'action_required', 'startup_failure', 'stale'}
+
 
 def deletion_ids(runs: list[dict], keep: int = 3, current: int = 0) -> list[int]:
     if keep < 1:
         raise ValueError('keep must be positive')
     unique = {int(run['id']): run for run in runs}
     ordered = sorted(unique, reverse=True)
-    retained = set(ordered[:keep])
+    successful = [i for i in ordered if unique[i].get('status')=='completed' and unique[i].get('conclusion') == 'success']
+    failed = [i for i in ordered if unique[i].get('status')=='completed' and unique[i].get('conclusion') in FAILURES]
+    retained = set(successful[:keep] + failed[:keep])
     if current:
         retained.add(current)
     return [run_id for run_id in ordered if run_id not in retained
-            and unique[run_id].get('status') == 'completed']
+            and unique[run_id].get('status') == 'completed'
+            and unique[run_id].get('conclusion') is not None]
 
 
 def main() -> None:
@@ -36,7 +41,7 @@ def main() -> None:
     runs = [run for page in pages for run in page['workflow_runs']]
     current = int(os.environ.get('GITHUB_RUN_ID', '0'))
     candidates = deletion_ids(runs, args.keep, current)
-    print(json.dumps({'repository': args.repo, 'keep': args.keep,
+    print(json.dumps({'repository': args.repo, 'keep_success': args.keep, 'keep_failure': args.keep,
                       'current': current, 'delete_ids': candidates}))
     if args.dry_run:
         return
