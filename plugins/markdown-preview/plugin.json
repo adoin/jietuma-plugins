@@ -1,7 +1,7 @@
 {
   "id": "markdown-preview",
   "name": "Markdown Preview",
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "markdown-preview.exe",
@@ -17,5 +17,10 @@
         ]
       }
     }
+  },
+  "icon": "icon.png",
+  "name_i18n": {
+    "zh": "Markdown 预览",
+    "zh_TW": "Markdown 預覽"
   }
 }

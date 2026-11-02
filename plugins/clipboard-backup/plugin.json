@@ -7,7 +7,7 @@
     "ja": "クリップボードの暗号化バックアップ",
     "ko": "클립보드 암호화 백업"
   },
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "clipboard-backup.exe",
@@ -20,5 +20,6 @@
         "command": "backup"
       }
     }
-  }
+  },
+  "icon": "icon.png"
 }

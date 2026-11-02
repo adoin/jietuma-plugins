@@ -7,7 +7,7 @@
     "ja": "テキストスクリプトを実行してコピー",
     "ko": "텍스트 스크립트 실행 후 복사"
   },
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "script-transform.exe",
@@ -37,5 +37,6 @@
         ]
       }
     }
-  }
+  },
+  "icon": "icon.png"
 }

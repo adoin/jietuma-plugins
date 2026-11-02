@@ -7,7 +7,7 @@
     "ja": "機密情報の保護",
     "ko": "민감 정보 보호"
   },
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "secret-filter.exe",
@@ -20,5 +20,6 @@
         ]
       }
     ]
-  }
+  },
+  "icon": "icon.png"
 }

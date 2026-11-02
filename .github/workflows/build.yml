@@ -1,11 +1,13 @@
 name: Publish plugins
 on:
   push:
-    tags: ['v*']
+    tags: ['v*', '*/v*']
 permissions:
   contents: read
 jobs:
   build:
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,17 +17,23 @@ jobs:
           python-version: '3.12'
       - run: python -m unittest discover -s scripts -p test_check_release_version.py
       - name: Validate release version
+        id: version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: python scripts/check_release_version.py $env:RELEASE_TAG
+        run: python scripts/check_release_version.py $env:RELEASE_TAG --github-output $env:GITHUB_OUTPUT
       - run: cargo test --locked
-      - run: python scripts/package.py
+      - name: Package selected plugins
+        env:
+          RELEASE_PLUGIN: ${{ steps.version.outputs.plugin }}
+        run: |
+          if ($env:RELEASE_PLUGIN) { python scripts/package.py --plugin $env:RELEASE_PLUGIN }
+          else { python scripts/package.py }
       - uses: actions/upload-artifact@v4
         with:
           name: jietuba-plugins-windows-x64
-          path: dist/*.jtbplugin
+          path: ${{ steps.version.outputs.assets }}
   release:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -38,4 +46,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*.jtbplugin
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ needs.build.outputs.prerelease == 'true' }}

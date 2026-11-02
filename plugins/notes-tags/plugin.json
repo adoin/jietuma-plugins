@@ -7,7 +7,7 @@
     "ja": "メモとタグ",
     "ko": "메모와 태그"
   },
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "contributes": {
@@ -45,5 +45,6 @@
         ]
       }
     }
-  }
+  },
+  "icon": "icon.png"
 }

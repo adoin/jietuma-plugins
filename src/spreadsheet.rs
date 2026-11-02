@@ -1,3 +1,4 @@
+mod formula_refs;
 mod protocol;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
@@ -11,6 +12,95 @@ struct Cell {
     span: usize,
 }
 type Grid = Vec<Vec<Cell>>;
+fn formula_tsv(rows: &Grid, row: usize, column: usize) -> String {
+    let mut converted = rows.clone();
+    for (r, cells) in converted.iter_mut().enumerate() {
+        for (c, cell) in cells.iter_mut().enumerate() {
+            if let Some(formula) = &cell.formula {
+                cell.text = formula_refs::a1(formula, row + r, column + c);
+            } else if cell.kind == "String" && cell.text.starts_with(['=', '+', '-', '@']) {
+                cell.text.insert(0, '\'');
+            }
+        }
+    }
+    tsv(&converted)
+}
+#[cfg(windows)]
+fn office_target(request: &Value) -> Result<Option<(usize, usize)>, ()> {
+    use std::{
+        os::windows::process::CommandExt,
+        process::{Command, Stdio},
+        time::{Duration, Instant},
+    };
+    let Some(window) = request["context"]["target_window"]
+        .as_str()
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|v| *v > 0)
+    else {
+        return Ok(None);
+    };
+    let script = format!(
+        "$expected=[UInt64]{window};\n{}",
+        include_str!("office_target.ps1")
+    );
+    let encoded = STANDARD.encode(
+        script
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+    // Built-in Windows PowerShell is available without an additional runtime installation.
+    let executable =
+        std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap_or("C:\\Windows".into()))
+            .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+    let mut child = Command::new(executable)
+        .args([
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
+            &encoded,
+        ])
+        .creation_flags(0x08000000)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| ())?;
+    let start = Instant::now();
+    loop {
+        if child.try_wait().map_err(|_| ())?.is_some() {
+            break;
+        }
+        if start.elapsed() > Duration::from_secs(5) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(());
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let output = child.wait_with_output().map_err(|_| ())?;
+    if !output.status.success() {
+        return Err(());
+    }
+    let result: Value = serde_json::from_slice(&output.stdout).map_err(|_| ())?;
+    if result["unsupported"] == true {
+        return Ok(None);
+    }
+    let row = result["row"]
+        .as_u64()
+        .filter(|v| *v > 0 && *v <= 1048576)
+        .ok_or(())?;
+    let column = result["column"]
+        .as_u64()
+        .filter(|v| *v > 0 && *v <= 16384)
+        .ok_or(())?;
+    Ok(Some((row as usize, column as usize)))
+}
+#[cfg(not(windows))]
+fn office_target(_: &Value) -> Result<Option<(usize, usize)>, ()> {
+    Ok(None)
+}
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -37,7 +127,17 @@ fn decoded(raw: &str) -> Option<String> {
         )
         .ok()?
     } else {
-        String::from_utf8(bytes).ok()?
+        match String::from_utf8(bytes) {
+            Ok(text) => text,
+            Err(error) => {
+                // WPS can emit legacy Chinese XML without an encoding declaration.
+                let (text, _, invalid) = encoding_rs::GBK.decode(error.as_bytes());
+                if invalid {
+                    return None;
+                }
+                text.into_owned()
+            }
+        }
     };
     Some(
         text.trim_matches('\0')
@@ -304,9 +404,7 @@ fn run(request: &Value, settings: &Value) -> Value {
     let data = &request["payload"]["data"];
     let command = request["command"].as_str().unwrap_or("");
     let command = if command == "paste-default" {
-        settings["default_paste"]
-            .as_str()
-            .unwrap_or("paste-original")
+        settings["default_paste"].as_str().unwrap_or("paste-smart")
     } else {
         command
     };
@@ -336,7 +434,22 @@ fn run(request: &Value, settings: &Value) -> Value {
         }
     }
     let Some(mut rows) = grid(data) else {
-        return protocol::declined();
+        return if command == "paste-smart" {
+            protocol::success("original", Value::Null)
+        } else {
+            protocol::declined()
+        };
+    };
+    let smart_paste = command == "paste-smart";
+    let command = if smart_paste {
+        if !settings["adjust_references"].as_bool().unwrap_or(true)
+            || !rows.iter().flatten().any(|cell| cell.formula.is_some())
+        {
+            return protocol::success("original", Value::Null);
+        }
+        "paste-formulas"
+    } else {
+        command
     };
     if command == "render" {
         let limit = settings["preview_rows"]
@@ -425,11 +538,52 @@ fn run(request: &Value, settings: &Value) -> Value {
             })
             .collect();
     }
-    let mut payload = xml(&rows, command == "paste-formulas").into_bytes();
+    // Automatic paste keeps the original styles and R1C1 references; only the
+    // transport encoding and competing fallback formats change.
+    let source = if smart_paste {
+        data["formats_base64"]["XML Spreadsheet"]
+            .as_str()
+            .and_then(decoded)
+            .map(|mut text| {
+                if text.starts_with("<?xml") {
+                    if let Some(end) = text.find("?>") {
+                        text.replace_range(..end + 2, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+                    }
+                }
+                text
+            })
+    } else {
+        None
+    };
+    let mut payload = source
+        .unwrap_or_else(|| xml(&rows, command == "paste-formulas"))
+        .into_bytes();
     payload.push(0);
+    let text = if command == "paste-formulas" {
+        match office_target(request) {
+            Ok(Some((row, column))) => formula_tsv(&rows, row, column),
+            Ok(None) => tsv(&rows),
+            Err(()) => {
+                return protocol::success(
+                    "error",
+                    json!(if request["context"]["language"]
+                        .as_str()
+                        .unwrap_or("")
+                        .starts_with("zh")
+                    {
+                        "无法读取 Excel/WPS 的目标单元格，请选中单元格后重试。"
+                    } else {
+                        "Cannot read the Excel/WPS destination. Select a cell and retry."
+                    }),
+                )
+            }
+        }
+    } else {
+        tsv(&rows)
+    };
     protocol::success(
         "clipboard",
-        json!({"text":tsv(&rows),"formats_base64":{"XML Spreadsheet":STANDARD.encode(payload)}}),
+        json!({"text":text,"formats_base64":{"XML Spreadsheet":STANDARD.encode(payload)}}),
     )
 }
 fn main() -> io::Result<()> {
@@ -488,5 +642,47 @@ mod tests {
         assert_eq!(rows[0][0].text, "a\tb");
         assert!(xml(&rows, false).contains("&lt;img&gt;"));
         assert!(xml_grid("<!DOCTYPE x [<!ENTITY a SYSTEM 'file:///secret'>]><Table/>").is_none());
+    }
+    #[test]
+    fn smart_paste_preserves_relative_absolute_and_mixed_references() {
+        let source = SAMPLE.replace("=RC[-1]*2", "=SUM(RC[-2]:RC[-1])+R2C2+R2C[-1]+RC2");
+        let mut request = input("paste-default");
+        request["payload"]["data"]["formats_base64"]["XML Spreadsheet"] =
+            json!(STANDARD.encode(source));
+        let result = run(&request, &json!({}));
+        assert_eq!(result["payload"]["kind"], "clipboard");
+        let output = decoded(
+            result["payload"]["data"]["formats_base64"]["XML Spreadsheet"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(output.contains("=SUM(RC[-2]:RC[-1])+R2C2+R2C[-1]+RC2"));
+        assert_eq!(
+            run(&request, &json!({"adjust_references":false}))["payload"]["kind"],
+            "original"
+        );
+        assert_eq!(
+            run(&request, &json!({"default_paste":"paste-values"}))["payload"]["kind"],
+            "clipboard"
+        );
+    }
+    #[test]
+    fn reads_wps_gbk_xml_and_preserves_formulas() {
+        let source = SAMPLE.replace("20</Data>", "中文</Data>");
+        let (bytes, _, _) = encoding_rs::GBK.encode(&source);
+        let mut request = input("paste-default");
+        request["payload"]["data"]["formats_base64"]["XML Spreadsheet"] =
+            json!(STANDARD.encode(bytes));
+        let result = run(&request, &json!({}));
+        assert_eq!(result["payload"]["kind"], "clipboard");
+        let output = decoded(
+            result["payload"]["data"]["formats_base64"]["XML Spreadsheet"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(output.contains("中文"));
+        assert!(output.contains("=RC[-1]*2"));
     }
 }

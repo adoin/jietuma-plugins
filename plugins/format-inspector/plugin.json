@@ -1,7 +1,7 @@
 {
   "id": "format-inspector",
   "name": "Format Inspector",
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "format-inspector.exe",
@@ -26,5 +26,10 @@
         ]
       }
     }
+  },
+  "icon": "icon.png",
+  "name_i18n": {
+    "zh": "剪贴板格式检查",
+    "zh_TW": "剪貼簿格式檢查"
   }
 }

@@ -5,7 +5,7 @@
     "zh": "代码高亮",
     "zh_TW": "程式碼高亮"
   },
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "code-highlight.exe",
@@ -306,5 +306,6 @@
         }
       ]
     }
-  }
+  },
+  "icon": "icon.png"
 }

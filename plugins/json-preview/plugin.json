@@ -1,7 +1,7 @@
 {
   "id": "json-preview",
   "name": "JSON Preview",
-  "version": "0.6.0",
+  "version": "1.0.1",
   "api_version": 2,
   "type": "extension",
   "command": "json-preview.exe",
@@ -17,5 +17,10 @@
         ]
       }
     }
+  },
+  "icon": "icon.png",
+  "name_i18n": {
+    "zh": "JSON 预览",
+    "zh_TW": "JSON 預覽"
   }
 }

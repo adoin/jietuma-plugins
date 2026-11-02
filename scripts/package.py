@@ -1,5 +1,7 @@
 """Build Windows preview plugins and package them as .jtbplugin ZIP files."""
 import json
+import argparse
+import io
 import pathlib
 import subprocess
 import zipfile
@@ -7,7 +9,18 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 def main():
-    subprocess.run(["cargo", "build", "--release", "--locked"], cwd=ROOT, check=True)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--plugin', default='', help='Package only this plugin ID')
+    args = parser.parse_args()
+    manifests = [json.loads(p.read_text(encoding='utf-8')) | {'_path': p} for p in sorted((ROOT / 'plugins').glob('*/plugin.json'))]
+    if args.plugin:
+        manifests = [m for m in manifests if m['id'] == args.plugin]
+        if not manifests:
+            parser.error('Unknown plugin ID')
+    command = ["cargo", "build", "--release", "--locked"]
+    if args.plugin and manifests[0].get('command'):
+        command += ['--bin', pathlib.Path(manifests[0]['command']).stem]
+    subprocess.run(command, cwd=ROOT, check=True)
     metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--format-version", "1", "--locked"], cwd=ROOT))
     licenses = []
     for crate in metadata["packages"]:
@@ -20,11 +33,16 @@ def main():
     notices = "\n\n".join(f"===== {name} =====\n{path.read_text(encoding='utf-8', errors='replace')}" for path, name in licenses)
     destination = ROOT / "dist"
     destination.mkdir(exist_ok=True)
-    for manifest_path in sorted((ROOT / "plugins").glob("*/plugin.json")):
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for manifest in manifests:
+        manifest_path = manifest['_path']
         output = destination / f"{manifest['id']}-{manifest['version']}.jtbplugin"
-        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as package:
+        archive_bytes=io.BytesIO()
+        with zipfile.ZipFile(archive_bytes, "w", compression=zipfile.ZIP_DEFLATED, strict_timestamps=False) as package:
             package.write(manifest_path, "plugin.json")
+            for asset in ('icon.png','icon.svg','plugin.ico'):
+                asset_path=manifest_path.parent/asset
+                if asset_path.is_file():
+                    package.write(asset_path,asset,compress_type=zipfile.ZIP_STORED if asset=='plugin.ico' else zipfile.ZIP_DEFLATED)
             if "command" in manifest:
                 executable = ROOT / "target" / "release" / manifest["command"]
                 package.write(executable, manifest["command"])
@@ -39,6 +57,8 @@ def main():
                         icons.add(icon)
             package.write(ROOT / "LICENSE", "licenses/jietuba-plugins-LICENSE")
             package.writestr("licenses/THIRD_PARTY_LICENSES.txt", notices.encode("utf-8"))
+        icon=manifest_path.parent/'plugin.ico'
+        output.write_bytes((icon.read_bytes() if icon.is_file() else b'')+archive_bytes.getvalue())
         print(output)
 
 if __name__ == "__main__":
