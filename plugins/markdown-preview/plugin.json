@@ -22,5 +22,10 @@
   "name_i18n": {
     "zh": "Markdown 预览",
     "zh_TW": "Markdown 預覽"
+  },
+  "description": "Preview Markdown text with formatting.",
+  "description_i18n": {
+    "zh": "预览 Markdown 排版。",
+    "zh_TW": "預覽 Markdown 排版。"
   }
 }

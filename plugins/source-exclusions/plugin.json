@@ -37,5 +37,10 @@
       }
     ]
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Exclude selected applications from clipboard capture.",
+  "description_i18n": {
+    "zh": "排除指定应用的剪贴板采集。",
+    "zh_TW": "排除指定應用程式的剪貼簿擷取。"
+  }
 }

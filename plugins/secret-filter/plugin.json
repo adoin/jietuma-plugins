@@ -21,5 +21,10 @@
       }
     ]
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Filter clipboard capture using sensitive-content rules.",
+  "description_i18n": {
+    "zh": "通过敏感内容规则过滤剪贴板采集。",
+    "zh_TW": "透過敏感內容規則篩選剪貼簿擷取。"
+  }
 }

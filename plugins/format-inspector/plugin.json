@@ -31,5 +31,10 @@
   "name_i18n": {
     "zh": "剪贴板格式检查",
     "zh_TW": "剪貼簿格式檢查"
+  },
+  "description": "Inspect the formats and metadata saved with a clipboard item.",
+  "description_i18n": {
+    "zh": "检查剪贴条目保存的原始格式与元数据。",
+    "zh_TW": "檢查剪貼項目儲存的原始格式與中繼資料。"
   }
 }

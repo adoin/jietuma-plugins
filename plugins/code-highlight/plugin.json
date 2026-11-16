@@ -307,5 +307,10 @@
       ]
     }
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Preview code with language selection and syntax highlighting.",
+  "description_i18n": {
+    "zh": "选择代码语言并预览语法高亮。",
+    "zh_TW": "選擇程式語言並預覽語法醒目提示。"
+  }
 }

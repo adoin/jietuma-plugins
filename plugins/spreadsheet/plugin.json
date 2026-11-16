@@ -204,5 +204,10 @@
       }
     }
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Preview spreadsheet cells and paste values, formats or saved formulas.",
+  "description_i18n": {
+    "zh": "预览表格单元格，粘贴数值、格式或已保存的公式。",
+    "zh_TW": "預覽試算表儲存格，貼上數值、格式或已儲存的公式。"
+  }
 }

@@ -27,5 +27,10 @@
   "name_i18n": {
     "zh": "富文本预览",
     "zh_TW": "富文字預覽"
+  },
+  "description": "Preview rich text saved on the clipboard.",
+  "description_i18n": {
+    "zh": "预览剪贴板中的 RTF 富文本。",
+    "zh_TW": "預覽剪貼簿中的 RTF 豐富文字。"
   }
 }

@@ -1,4 +1,4 @@
-name: Publish plugins
+name: Publish plugin market
 on:
   push:
     tags: ['v*', '*/v*']
@@ -9,52 +9,93 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  plan:
+    runs-on: ubuntu-latest
     outputs:
-      prerelease: ${{ steps.version.outputs.prerelease }}
+      build: ${{ steps.plan.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts -p 'test_*.py'
+      - id: plan
+        name: Reuse published versions and plan changed packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/market.py plan --plan market-plan.json --github-output "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-plan
+          path: market-plan.json
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: market-plan
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m unittest discover -s scripts -p test_check_release_version.py
-      - run: python -m unittest discover -s scripts -p test_actions_retention.py
-      - name: Validate release version
-        id: version
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: python scripts/check_release_version.py $env:RELEASE_TAG --github-output $env:GITHUB_OUTPUT
-      - run: cargo test --locked
-      - name: Package selected plugins
-        env:
-          RELEASE_PLUGIN: ${{ steps.version.outputs.plugin }}
+      - if: matrix.arch == 'x64'
+        run: cargo test --locked
+      - if: matrix.arch == 'arm64'
+        run: rustup target add aarch64-pc-windows-msvc
+      - name: Build selected plugins once for this architecture
         run: |
-          if ($env:RELEASE_PLUGIN) { python scripts/package.py --plugin $env:RELEASE_PLUGIN }
-          else { python scripts/package.py }
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          Import-Module (Join-Path $vs 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+          $target = if ('${{ matrix.arch }}' -eq 'arm64') { 'arm64' } else { 'x64' }
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments "-arch=$target -host_arch=x64"
+          python scripts/package.py --plan market-plan.json --arch ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         with:
-          name: jietuma-plugins-windows-x64
-          path: ${{ steps.version.outputs.assets }}
+          name: jietuma-plugins-${{ matrix.arch }}
+          path: dist/windows-*/
+          if-no-files-found: error
+
   release:
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build
+    needs: [plan, build]
+    if: always() && needs.plan.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - uses: actions/download-artifact@v4
         with:
-          name: jietuma-plugins-windows-x64
-          path: dist
-      - uses: softprops/action-gh-release@v2
+          name: market-plan
+      - if: needs.plan.outputs.build == 'true'
+        uses: actions/download-artifact@v4
         with:
-          files: dist/*.jtbplugin
-          prerelease: ${{ needs.build.outputs.prerelease == 'true' }}
+          pattern: jietuma-plugins-*
+          path: dist
+      - name: Publish immutable packages, then the complete marketplace snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/market.py publish --plan market-plan.json --directory dist
 
   cleanup:
-    needs: [build, release]
+    needs: [plan, build, release]
     if: always()
     runs-on: ubuntu-latest
     permissions:

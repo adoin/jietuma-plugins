@@ -22,5 +22,10 @@
   "name_i18n": {
     "zh": "JSON 预览",
     "zh_TW": "JSON 預覽"
+  },
+  "description": "Preview JSON as a structured tree.",
+  "description_i18n": {
+    "zh": "以树形结构预览 JSON。",
+    "zh_TW": "以樹狀結構預覽 JSON。"
   }
 }

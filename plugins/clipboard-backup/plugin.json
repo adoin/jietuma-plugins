@@ -21,5 +21,10 @@
       }
     }
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Encrypt, export and restore clipboard history.",
+  "description_i18n": {
+    "zh": "加密导出与恢复剪贴板历史。",
+    "zh_TW": "加密匯出與還原剪貼簿歷史。"
+  }
 }

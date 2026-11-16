@@ -1,0 +1,6 @@
+{
+  "schema_version": 2,
+  "default_host": ">=2.3.0,<3.0.0",
+  "platforms": ["windows-x86_64", "windows-arm64"],
+  "removed_plugin_ids": []
+}

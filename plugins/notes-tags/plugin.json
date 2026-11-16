@@ -46,5 +46,10 @@
       }
     }
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Add notes and tags to clipboard history items.",
+  "description_i18n": {
+    "zh": "为剪贴板历史条目添加备注和标签。",
+    "zh_TW": "為剪貼簿歷史項目新增備註和標籤。"
+  }
 }

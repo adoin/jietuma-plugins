@@ -38,5 +38,10 @@
       }
     }
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Transform clipboard text with configurable Rhai scripts.",
+  "description_i18n": {
+    "zh": "通过可配置的 Rhai 脚本转换剪贴文本。",
+    "zh_TW": "透過可設定的 Rhai 指令碼轉換剪貼文字。"
+  }
 }

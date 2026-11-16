@@ -24,5 +24,10 @@
       }
     }
   },
-  "icon": "icon.png"
+  "icon": "icon.png",
+  "description": "Format JSON clipboard text.",
+  "description_i18n": {
+    "zh": "格式化剪贴板中的 JSON 文本。",
+    "zh_TW": "格式化剪貼簿中的 JSON 文字。"
+  }
 }

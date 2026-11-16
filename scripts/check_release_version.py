@@ -4,9 +4,10 @@ import argparse
 import json
 from pathlib import Path
 import re
+from market_protocol import VERSION as SEMVER, Version
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?"
+VERSION = SEMVER.pattern.removesuffix(r'\Z')
 TAG = re.compile(rf"(?:(?P<plugin>[a-z0-9][a-z0-9._-]*)/)?v(?P<version>{VERSION})\Z")
 
 def validate(tag: str, plugins: dict[str, str]) -> tuple[str, str]:
@@ -16,8 +17,8 @@ def validate(tag: str, plugins: dict[str, str]) -> tuple[str, str]:
     if not plugins:
         raise ValueError("No plugin manifests found")
     for name, version in plugins.items():
-        if not re.fullmatch(VERSION, version):
-            raise ValueError(f"Invalid version for {name}: {version}")
+        Version(version)
+    Version(match.group('version'))
     plugin = match.group('plugin') or ''
     version = match.group('version')
     if plugin:
@@ -47,7 +48,7 @@ def main():
         with args.github_output.open('a', encoding='utf-8') as output:
             output.write(f'plugin={plugin}\n')
             output.write(f'assets=dist/{plugin}-{version}.jtbplugin\n' if plugin else 'assets=dist/*.jtbplugin\n')
-            output.write(f'prerelease={str("-" in version).lower()}\n')
+            output.write(f'prerelease={str(bool(Version(version).pre)).lower()}\n')
     print(f'Release {args.tag}: {plugin or "all plugins with independent versions"}')
 
 if __name__ == '__main__':
