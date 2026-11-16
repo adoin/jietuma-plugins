@@ -15,6 +15,16 @@ class GitHub:
         self.repository=repository
         self.info=self.json(f'repos/{repository}')
     def json(self,path):return json.loads(subprocess.check_output(['gh','api',path],encoding='utf-8'))
+    def request(self,method,path,payload):
+        return json.loads(subprocess.check_output(['gh','api','--method',method,path,'--input','-'],input=canonical_bytes(payload)))
+    def create_release(self,tag):
+        return self.request('POST',f'repos/{self.repository}/releases',{'tag_name':tag,'name':tag,'draft':True,
+            'body':'Plugin package release.' if not tag.startswith('market/') else 'Complete plugin marketplace snapshot.'})
+    def upload_asset(self,release,path):
+        endpoint=f'https://uploads.github.com/repos/{self.repository}/releases/{release["id"]}/assets?name={quote(path.name,safe="")}'
+        return json.loads(subprocess.check_output(['gh','api','--method','POST',endpoint,'-H','Content-Type: application/octet-stream','--input',str(path)]))
+    def publish_release(self,release,prerelease=False,latest=False):
+        return self.request('PATCH',f'repos/{self.repository}/releases/{release["id"]}',{'draft':False,'prerelease':prerelease,'make_latest':'true' if latest else 'false'})
     def binary(self,asset):
         value=subprocess.check_output(['gh','api',f'repos/{self.repository}/releases/assets/{asset["id"]}','-H','Accept: application/octet-stream'])
         if len(value)>4*1024**2:raise ValueError('Market metadata is too large')
@@ -91,7 +101,7 @@ def plan(api,tag,revision,root=ROOT):
         else:builds.append(identity)
     return {'tag':tag,'revision':revision,'repository_id':api.info['id'],'builds':builds,'selected':selected,'complete':False}
 
-def ensure_release(api,tag,revision,prerelease=False):
+def ensure_release(api,tag,revision,root=ROOT):
     release=next((r for r in api.releases() if r['tag_name']==tag),None)
     if release and not release['draft']:return release
     obj=api.tag_object(tag)
@@ -100,10 +110,14 @@ def ensure_release(api,tag,revision,prerelease=False):
     for _ in range(4):
         if obj['type']!='tag':break
         obj=api.json(f'repos/{api.repository}/git/tags/{obj["sha"]}')['object']
-    if obj['type']!='commit' or obj['sha']!=revision:raise ValueError('Existing tag points to another revision; publish a new version')
-    if not release:
-        api.command('release','create',tag,'--verify-tag','--draft','--title',tag,'--notes','Plugin package release.' if not tag.startswith('market/') else 'Complete plugin marketplace snapshot.')
-        release=api.json(f'repos/{api.repository}/releases/tags/{quote(tag,safe="")}')
+    if obj['type']!='commit':raise ValueError('Existing tag does not point to a commit')
+    if obj['sha']!=revision:
+        # A publisher-only fix may resume an unpublished version without moving its tag.
+        identity=tag.partition('/v')[0]
+        if tag.startswith('market/') or source_digest_at_revision(identity,obj['sha'],root)!=source_digest_at_revision(identity,revision,root):
+            raise ValueError('Existing tag points to another revision with different plugin sources; publish a new version')
+    if not release:release=api.create_release(tag)
+    release=dict(release);release['_source_revision']=obj['sha']
     return release
 
 
@@ -115,7 +129,7 @@ def upload_draft(api,release,path):
             return
         # Only an unpublished draft may be repaired after an interrupted upload.
         subprocess.run(['gh','api','--method','DELETE',f'repos/{api.repository}/releases/assets/{asset["id"]}'],check=True)
-    api.command('release','upload',release['tag_name'],str(path))
+    api.upload_asset(release,path)
 
 def publish(api,request,directory,root=ROOT):
     if request['repository_id']!=api.info['id']:raise ValueError('Publishing repository identity mismatch')
@@ -135,17 +149,17 @@ def publish(api,request,directory,root=ROOT):
             if entry['id'] not in request['builds'] or entry['version']!=items[entry['id']]['version'] or entry['host']!=items[entry['id']]['host']:raise ValueError('Built package does not match release plan')
             packaged[key]=(entry,archive)
     for identity in request['selected']:
-        item=items[identity];version=item['version'];release=ensure_release(api,f'{identity}/v{version}',revision)
+        item=items[identity];version=item['version'];release=ensure_release(api,f'{identity}/v{version}',revision,root)
         if not release['draft']:
             package_entries(api,release,item);continue
         entries=[]
         for platform in PLATFORMS:
             if (identity,platform) not in packaged:raise ValueError(f'Missing built package: {identity} {platform}')
             entry,archive=packaged[identity,platform];entries.append(entry);upload_draft(api,release,archive)
-        record={'id':identity,'version':version,'revision':revision,'source_digest':source_digest(identity,root),'packages':entries}
+        record={'id':identity,'version':version,'revision':release['_source_revision'],'source_digest':source_digest(identity,root),'packages':entries}
         info=directory/f'{identity}-build-info'/ 'plugin-build.json';info.parent.mkdir(parents=True,exist_ok=True);info.write_bytes(canonical_bytes(record));upload_draft(api,release,info)
         prerelease=bool(Version(version).pre)
-        api.command('release','edit',release['tag_name'],'--draft=false','--prerelease='+str(prerelease).lower(),'--latest=false')
+        api.publish_release(release,prerelease=prerelease)
     # Read the current market only after package publishing; partial successes remain reusable.
     rows=api.releases();previous=latest_catalog(api,rows);entries={(e['id'],e['version'],e['platform']):e for e in (previous or {}).get('plugins',[])}
     icons=(previous or {}).get('icons',{}).copy()
@@ -166,9 +180,9 @@ def publish(api,request,directory,root=ROOT):
     validate_catalog(value,api.info['id']);body=canonical_bytes(value)
     if len(body)>4*1024**2:raise ValueError('Market snapshot exceeds client size limit')
     path=directory/'market-output'/'plugin-market.json';path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(body)
-    release=ensure_release(api,snapshot,revision);upload_draft(api,release,path)
+    release=ensure_release(api,snapshot,revision,root);upload_draft(api,release,path)
     checksum=path.with_suffix('.json.sha256');checksum.write_text(hashlib.sha256(body).hexdigest()+'  plugin-market.json\n',encoding='utf-8');upload_draft(api,release,checksum)
-    api.command('release','edit',snapshot,'--draft=false','--latest')
+    api.publish_release(release,latest=True)
     print(f'Published marketplace: {snapshot}')
 
 def main():

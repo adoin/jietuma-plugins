@@ -2,6 +2,9 @@
 from __future__ import annotations
 from functools import total_ordering
 import hashlib
+import io
+import subprocess
+import tarfile
 import json
 from pathlib import Path, PurePosixPath
 import re
@@ -66,6 +69,23 @@ def source_digest(identity: str, root=ROOT):
     sha=hashlib.sha256()
     for path in paths:
         if path.is_file():sha.update(path.relative_to(root).as_posix().encode());sha.update(path.read_bytes())
+    return sha.hexdigest()
+
+def source_digest_at_revision(identity,revision,root=ROOT):
+    if not IDENTITY.fullmatch(identity) or not re.fullmatch('[a-f0-9]{40}',revision):raise ValueError('Invalid source identity')
+    try:
+        raw=subprocess.check_output(['git','archive','--format=tar',revision,'--','Cargo.toml','Cargo.lock','market-config.json','src','plugins/'+identity],cwd=root,stderr=subprocess.PIPE)
+    except subprocess.CalledProcessError as error:raise ValueError('Could not verify the existing tag source') from error
+    files={}
+    with tarfile.open(fileobj=io.BytesIO(raw)) as archive:
+        for member in archive:
+            if member.isfile():files[member.name]=archive.extractfile(member).read()
+            elif not member.isdir():raise ValueError('Linked source files are not supported')
+    paths=['Cargo.toml','Cargo.lock','market-config.json']
+    paths+=sorted(name for name in files if name.startswith('src/') and name.endswith('.rs'))
+    paths+=sorted(name for name in files if name.startswith('plugins/'+identity+'/'))
+    sha=hashlib.sha256()
+    for name in paths:sha.update(name.encode());sha.update(files[name])
     return sha.hexdigest()
 
 def asset_name(identity,version,platform):return f'{identity}-{version}-{platform}.jtbplugin'

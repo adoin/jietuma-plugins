@@ -5,13 +5,14 @@ import io
 import json
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import zipfile
 import unittest
 from unittest.mock import patch
 from urllib.parse import quote
 import market
-from market_protocol import Version, canonical_bytes, source_digest, validate_catalog, verify_archive, snapshot_tag
+from market_protocol import Version, canonical_bytes, source_digest, validate_catalog, verify_archive, snapshot_tag, source_digest_at_revision
 from package import package_plugin
 
 class API:
@@ -20,16 +21,21 @@ class API:
     def releases(self):return self.rows
     def tag_object(self,tag):return {"type":"commit","sha":self.refsha}
     def create_tag(self,tag,revision):self.refsha=revision
+    def create_release(self,tag):
+        row={'id':99+len(self.rows),'tag_name':tag,'draft':True,'prerelease':False,'assets':[]}
+        self.rows.append(row);self.commands.append(('create',row['id']));return row
+    def upload_asset(self,release,path):
+        row=next(r for r in self.rows if r['id']==release['id']);identity=1000+len(self.bytes);raw=path.read_bytes()
+        asset={'id':identity,'name':path.name,'size':len(raw),'digest':'sha256:'+hashlib.sha256(raw).hexdigest(),
+            'browser_download_url':'https://github.com/owner/plugins/releases/download/'+quote(row['tag_name'],safe='')+'/'+path.name}
+        row['assets'].append(asset);self.bytes[identity]=raw;self.commands.append(('upload',release['id'],path.name));return asset
+    def publish_release(self,release,prerelease=False,latest=False):
+        row=next(r for r in self.rows if r['id']==release['id']);row.update(draft=False,prerelease=prerelease,published_at='2026-11-16T00:00:00Z')
+        self.commands.append(('publish',release['id'],prerelease,latest));return row
     def binary(self,asset):return self.bytes[asset['id']]
     def json(self,path):
         if '/git/ref/tags/' in path:return {'object':{'type':'commit','sha':self.refsha}}
-        tag=path.split('/tags/')[-1]
-        from urllib.parse import unquote
-        return next(r for r in self.rows if r['tag_name']==unquote(tag))
-    def command(self,*args):
-        self.commands.append(args)
-        if args[:2]==('release','create'):
-            self.rows.append({'id':99,'tag_name':args[2],'draft':True,'prerelease':False,'assets':[]})
+        raise AssertionError('Unexpected API lookup: '+path)
 
 class MarketTests(unittest.TestCase):
     def setUp(self):
@@ -81,7 +87,8 @@ class MarketTests(unittest.TestCase):
         self.assertNotEqual(snapshot_tag(self.revision,'fixture/v1.0.0'),snapshot_tag(self.revision,'another/v1.0.0'))
     def test_existing_tags_are_never_moved_to_a_different_source(self):
         self.api.refsha='b'*40
-        with self.assertRaisesRegex(ValueError,'another revision'):market.ensure_release(self.api,'fixture/v1.0.0',self.revision)
+        with patch('market.source_digest_at_revision',side_effect=['old','new']):
+            with self.assertRaisesRegex(ValueError,'another revision'):market.ensure_release(self.api,'fixture/v1.0.0',self.revision)
     def test_newest_catalog_uses_publish_time(self):
         for identity,date in ((1,'2026-01-02T00:00:00Z'),(2,'2026-01-03T00:00:00Z')):
             value={'schema_version':2,'repository_id':7,'revision':str(identity)*40,'plugins':[]}
@@ -119,6 +126,38 @@ class MarketTests(unittest.TestCase):
         self.api.tag_object=tag_object
         market.ensure_release(self.api,'fixture/v1.0.0',self.revision)
         self.assertEqual(self.api.refsha,self.revision)
+    def test_first_publication_uses_draft_ids_without_tag_lookup(self):
+        request=market.plan(self.api,'v1.0.0',self.revision,self.root)
+        output=self.root/'output'
+        for platform in ('windows-x86_64','windows-arm64'):
+            folder=output/platform;entry=package_plugin(self.item,None,folder,'notices',platform,self.root)
+            (folder/f'packaged-{platform}.json').write_bytes(canonical_bytes([entry]))
+        with contextlib.redirect_stdout(io.StringIO()):market.publish(self.api,request,output,self.root)
+        self.assertTrue(all(not row['draft'] for row in self.api.rows))
+        value=market.latest_catalog(self.api,self.api.rows);self.assertEqual(len(value['plugins']),2)
+        self.assertEqual([c for c in self.api.commands if c[0]=='publish'][-1][-1],True)
+        # Completed snapshot retries must neither upload nor reset latest.
+        self.api.commands=[]
+        with contextlib.redirect_stdout(io.StringIO()):market.publish(self.api,request,output,self.root)
+        self.assertFalse(self.api.commands)
+    def test_resume_existing_draft_does_not_create_another_release(self):
+        draft=self.api.create_release('fixture/v1.0.0');self.api.commands=[]
+        result=market.ensure_release(self.api,'fixture/v1.0.0',self.revision,self.root)
+        self.assertEqual(result['id'],draft['id']);self.assertFalse(self.api.commands)
+    def test_publisher_only_repair_preserves_original_tag_and_source_commit(self):
+        def git(*args):return subprocess.check_output(['git',*args],cwd=self.root,stderr=subprocess.PIPE).decode().strip()
+        def commit():
+            git('add','.');git('-c','user.name=Market Test','-c','user.email=test@example.invalid','commit','-qm','fixture');return git('rev-parse','HEAD')
+        (self.root/'src').mkdir();(self.root/'src/fixture.rs').write_text('fn main() {}')
+        git('init');old=commit()
+        (self.root/'publisher.py').write_text('release repair');new=commit()
+        self.assertEqual(source_digest_at_revision('fixture',old,self.root),source_digest_at_revision('fixture',new,self.root))
+        self.api.refsha=old;draft=self.api.create_release('fixture/v1.0.0')
+        result=market.ensure_release(self.api,'fixture/v1.0.0',new,self.root)
+        self.assertEqual(result['_source_revision'],old);self.assertEqual(self.api.refsha,old)
+        (self.root/'src/fixture.rs').write_text('fn main() { panic!(); }');changed=commit()
+        with self.assertRaisesRegex(ValueError,'different plugin sources'):market.ensure_release(self.api,'fixture/v1.0.0',changed,self.root)
+        with self.assertRaisesRegex(ValueError,'another revision'):market.ensure_release(self.api,'market/snapshot',new,self.root)
     def test_payload_architecture_and_manifest_are_validated(self):
         executable=self.root/'fixture.exe';binary=bytearray(96);binary[:2]=b'MZ';struct.pack_into('<I',binary,60,64);binary[64:68]=b'PE\0\0';struct.pack_into('<H',binary,68,0x8664);executable.write_bytes(binary)
         entry=package_plugin(self.item|{'command':'fixture.exe'},executable,self.root/'built','notices','windows-x86_64',self.root)
